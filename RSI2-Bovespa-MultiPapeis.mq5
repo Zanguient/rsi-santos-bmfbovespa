@@ -17,6 +17,7 @@
 #include <Trade\SymbolInfo.mqh>
 #include <Trade\PositionInfo.mqh>
 #include <Trade\AccountInfo.mqh>
+
 // #include <Tester.mqh>
 
 enum BuyOrSell
@@ -35,38 +36,40 @@ enum BMFBOV
 
 //--- input parameters
 input string            separator1        = "---General Settings---";  // #############################
-// input double            ContractsNr       = 0.1;               // Number of contracts
+input string            papeis            = "LCAM3,FESA3,FLRY3,SAPR4,PSSA3,SANB11,RADL3,PTBL3,TAEE11,SULA11";     // Lista de Papeis separados por virgula (obs: coloque na watch list)
 input BMFBOV            mercado           = BOVESPA;
 input double            Amount            = 5000;              // Valor da Compra
 input ENUM_TIMEFRAMES   mytimeframe       = 0;                 // Timeframe
 input double            StopLevel         = 1.3;               // Stop level com base em 130% da barra anterior
-input double            MinPointsToProfit = 50;                // Min Points to Profit
-input BuyOrSell         BuyOrSell_        = BOTH;              // Buy, Sell or Both?
+input double            MinPointsToProfit = 0;                // Min Points to Profit
+input BuyOrSell         BuyOrSell_        = BUY;              // Buy, Sell or Both?
 
 input string            separator11       = "---MeanPrice Settings---"; // #############################
-input double            MaxMeanPriceX     = 3;                 // Make mean price N times
-input double            PointsFirstMeanPrice     = 100;                 // Min points to first mean price
+input double            MaxMeanPriceX     = 0;                 // Make mean price N times
+input double            PointsFirstMeanPrice     = 0;                 // Min points to first mean price
 input bool              CloseWinning      = false;             // Close only when Profit > 0
 
 input string            separator2        = "---RSI2 Settings---"; // #############################
 input int               RSIPeriod         = 2;                 // RSI Period
-input int               RSILimit          = 5;                 // RSI threshold to open position
+input int               RSILimit          = 10;                 // RSI threshold to open position
 input int               RSIBars           = 1;                 // Number of bars for RSI over/under threshold
-input bool              CheckLongSMA      = false;             // Uses Long SMA?
+input bool              CheckLongSMA      = true;             // Uses Long SMA?
 input int               SMA1Period        = 200;               // Long SMA Period
 input int               SMASHORTPeriod    = 7;                 // SMA to Close Position
 
 input string            separator3           = "---Time Settings---"; // #############################
-input bool              CheckInterval_bool   = false;             // Check Time Interval?
-input int               StartHour            = 9;                 // Start hour
-input int               StartMinute          = 0;                 // Start minute
+input bool              CheckInterval_bool   = true;             // Check Time Interval?
+input int               StartHour            = 16;                 // Start hour
+input int               StartMinute          = 45;                 // Start minute
 input int               EndHour              = 17;                // Stop hour
-input int               EndMinute            = 30;                // Stop minute
+input int               EndMinute            = 0;                // Stop minute
 
 
-int               iSMA1_handle;
-int               iSMASHORT_handle;
-int               iRSI_handle; 
+string            papeis_array[];
+int               number_symbols;
+int               iSMA1_handle[];
+int               iSMASHORT_handle[];
+int               iRSI_handle[]; 
 int               CandleTimeFrame;
 
 string            my_symbol;
@@ -147,37 +150,45 @@ int OnInit() {
     m_Trade.SetExpertMagicNumber(_MagicNumber);
     // HELPER_MagicNumber = _MagicNumber;
 
-   my_symbol = Symbol();
+   // my_symbol = Symbol();
    // mytimeframe=Period();
    // mytimeframe = mytimeframe;
 
-   // MOVING AVERAGE1
-   iSMA1_handle=iMA(my_symbol,mytimeframe,SMA1Period,0,MODE_SMA,PRICE_CLOSE);
-   if(iSMA1_handle==INVALID_HANDLE){
-      Print("Failed to get the indicator handle");
-      return(-1);
-   }
+   // 
+   number_symbols = StringSplit(papeis,StringGetCharacter(",",0),papeis_array);
+   ArrayResize(iSMA1_handle,number_symbols);
+   ArrayResize(iSMASHORT_handle,number_symbols);
+   ArrayResize(iRSI_handle,number_symbols);
    
-   iSMASHORT_handle=iMA(my_symbol,mytimeframe,SMASHORTPeriod,0,MODE_SMA,PRICE_CLOSE);
-   if(iSMASHORT_handle==INVALID_HANDLE){
-      Print("Failed to get the indicator handle");
-      return(-1);
-   }
+   for (int i=0; i<number_symbols; i++) {
+      iSMA1_handle[i] = iMA(papeis_array[i],mytimeframe,SMA1Period,0,MODE_SMA,PRICE_CLOSE);
+      if(iSMA1_handle[i] == INVALID_HANDLE){
+         Print("Failed to get SMA Long indicator handle [",papeis_array[i],"]");
+         return(-1);
+      }
+      
+      iSMASHORT_handle[i] = iMA(papeis_array[i],mytimeframe,SMASHORTPeriod,0,MODE_SMA,PRICE_CLOSE);
+      if(iSMASHORT_handle[i] == INVALID_HANDLE){
+         Print("Failed to get SMA Short indicator handle [",papeis_array[i],"]");
+         return(-1);
+      }
+   
+      // RSI
+      iRSI_handle[i] = iRSI(papeis_array[i],mytimeframe,RSIPeriod,PRICE_CLOSE);
+      if(iRSI_handle[i] == INVALID_HANDLE){
+         Print("Failed to get RSI indicator handle [",papeis_array[i],"]");
+         return(-1);
+      }
+      
+      ArraySetAsSeries(iSMA1_buf,true);
+      ArraySetAsSeries(iSMASHORT_buf,true);
+      ArraySetAsSeries(iRSI_buf,true);
+      ArraySetAsSeries(Open_buf,true);
+      ArraySetAsSeries(Close_buf,true);
+      ArraySetAsSeries(High_buf,true);
+      ArraySetAsSeries(Low_buf,true);
 
-   // RSI
-   iRSI_handle=iRSI(my_symbol,mytimeframe,RSIPeriod,PRICE_CLOSE);
-   if(iRSI_handle==INVALID_HANDLE){
-      Print("Failed to get the indicator handle");
-      return(-1);
    }
-   
-   ArraySetAsSeries(iSMA1_buf,true);
-   ArraySetAsSeries(iSMASHORT_buf,true);
-   ArraySetAsSeries(iRSI_buf,true);
-   ArraySetAsSeries(Open_buf,true);
-   ArraySetAsSeries(Close_buf,true);
-   ArraySetAsSeries(High_buf,true);
-   ArraySetAsSeries(Low_buf,true);
 
    return(INIT_SUCCEEDED);
 
@@ -192,9 +203,11 @@ int OnInit() {
 //+------------------------------------------------------------------+
 
 void OnDeinit(const int reason) {
-   IndicatorRelease(iSMA1_handle);
-   IndicatorRelease(iSMASHORT_handle);
-   IndicatorRelease(iRSI_handle);
+   for(int i=0; i<number_symbols; i++){
+      IndicatorRelease(iSMA1_handle[i]);
+      IndicatorRelease(iSMASHORT_handle[i]);
+      IndicatorRelease(iRSI_handle[i]);
+   }
    ArrayFree(iSMA1_buf);
    ArrayFree(iSMASHORT_buf);
    ArrayFree(iRSI_buf);
@@ -408,217 +421,202 @@ double GetPositionDealOpenPrice(int position)
 
 void OnTick() {
 
-   // verify seconds to jump tick test
-   /*
-   ushort u_sep = StringGetCharacter(":",0);
-   string time_str = TimeToString(TimeCurrent(), TIME_SECONDS);
-   string time_arr[];
-   StringSplit(time_str, u_sep, time_arr);
-   int segundo_agora = (int)StringToInteger(time_arr[2]);
-   if (segundo_agora % 10 != 0) {
-      // Print("   Sai ", segundo_agora);
-      return;
-   }
-   */
-
-   // OnTester
-   //static datetime old_day;
-   //if(HelperIsNewDay(old_day)) {
-  //    HelperLogDaytrade();
-   //}
-
    bool err = false;
       
    double free_margin=0;
    double new_order_volume=0;
-   
-   // update data - FIX BUG de realizar varias operacoes em milisegundos
-   m_Position.Select(my_symbol);
-   
-   double price_open = m_Position.PriceOpen();
-   int position_deals = PositionDeals();
-   double last_deals_diff = 0;
-   
-   err |= CopyBuffer(iSMA1_handle,0,0,2,iSMA1_buf) < 0 ? true : false;
-   err |= CopyBuffer(iRSI_handle,0,0,RSIBars,iRSI_buf) < 0 ? true : false;
-   err |= CopyOpen(my_symbol,mytimeframe,0,2,Open_buf) < 0 ? true : false;
-   err |= CopyClose(my_symbol,mytimeframe,0,2,Close_buf) < 0 ? true : false;
-   err |= CopyHigh(my_symbol,mytimeframe,0,3,High_buf) < 0 ? true : false;
-   err |= CopyLow(my_symbol,mytimeframe,0,3,Low_buf) < 0 ? true : false;
-   err |= CopyBuffer(iSMASHORT_handle,0,0,2,iSMASHORT_buf) < 0 ? true : false;
-   
-   if(err)
-   {
-      Print("Failed to copy data from the indicator buffer or price chart buffer");
-      return;
-   }
-   
-   // verifica RSI de acordo com a quantidade de barras que devem estar abaixo do limite
-   bool RSI_COMPRA_OK = true;
-   for (int i = 0; i < RSIBars; i++) {
-      RSI_COMPRA_OK = RSI_COMPRA_OK && (iRSI_buf[i] < RSILimit);
-   }
-   
-   bool RSI_VENDA_OK = true;
-   for (int i = 0; i < RSIBars; i++) {
-      RSI_VENDA_OK = RSI_VENDA_OK && (iRSI_buf[i] > (100-RSILimit));
-   }
-   
-   double max_last2 = MathMax(High_buf[1], High_buf[2]);
-   double min_last2 = MathMax(Low_buf[1], Low_buf[2]);
-   
-   bool STOP_BOM_COMPRA = (max_last2 - Close_buf[0]) > ((High_buf[0] - Low_buf[0])*StopLevel);
-   bool STOP_BOM_VENDA = (Close_buf[0] - min_last2) > ((High_buf[0] - Low_buf[0])*StopLevel);
 
-   // compra bools
-   bool CONDICOES_COMPRA_IN = 
-      CheckInterval(TimeCurrent())           // dentro do intervalo
-      && RSI_COMPRA_OK                       // RSI ultrapassou o limite
-      && STOP_BOM_COMPRA
-      && (Close_buf[0] > iSMA1_buf[0] || !CheckLongSMA);          // acima da media movel maior
+   for (int ii=0; ii<number_symbols; ii++) {   
 
-   // venda bools      
-   bool CONDICOES_VENDA_IN = 
-      CheckInterval(TimeCurrent()) 
-      && RSI_VENDA_OK
-      && STOP_BOM_VENDA
-      && (Close_buf[0] < iSMA1_buf[0] || !CheckLongSMA);
+      my_symbol = papeis_array[ii];
 
-   // OUT
-   if(m_Position.Select(my_symbol)) {
-      if(m_Position.PositionType() == POSITION_TYPE_BUY) {
-         if (CloseWinning) {
-            if (Close_buf[0] >= iSMASHORT_buf[0] && Close_buf[0] >= (price_open + MinPointsToProfit*Point())) {
-               m_Trade.PositionClose(my_symbol, 0);
-            }
-         } else {
-            if (Close_buf[0] >= iSMASHORT_buf[0]) {
-               m_Trade.PositionClose(my_symbol, 0);
+      // update data - FIX BUG de realizar varias operacoes em milisegundos
+      m_Position.Select(my_symbol);
+   
+      double price_open = m_Position.PriceOpen();
+      int position_deals = PositionDeals();
+      double last_deals_diff = 0;
+      
+      err |= CopyBuffer(iSMA1_handle[ii],0,0,2,iSMA1_buf) < 0 ? true : false;
+      err |= CopyBuffer(iRSI_handle[ii],0,0,RSIBars,iRSI_buf) < 0 ? true : false;
+      err |= CopyBuffer(iSMASHORT_handle[ii],0,0,2,iSMASHORT_buf) < 0 ? true : false;
+      err |= CopyOpen(my_symbol,mytimeframe,0,2,Open_buf) < 0 ? true : false;
+      err |= CopyClose(my_symbol,mytimeframe,0,2,Close_buf) < 0 ? true : false;
+      err |= CopyHigh(my_symbol,mytimeframe,0,3,High_buf) < 0 ? true : false;
+      err |= CopyLow(my_symbol,mytimeframe,0,3,Low_buf) < 0 ? true : false;
+      
+      if(err)
+      {
+         Print("Failed to copy data from the indicator buffer or price chart buffer");
+         return;
+      }
+      
+      // verifica RSI de acordo com a quantidade de barras que devem estar abaixo do limite
+      bool RSI_COMPRA_OK = true;
+      for (int i = 0; i < RSIBars; i++) {
+         RSI_COMPRA_OK = RSI_COMPRA_OK && (iRSI_buf[i] < RSILimit);
+      }
+      
+      bool RSI_VENDA_OK = true;
+      for (int i = 0; i < RSIBars; i++) {
+         RSI_VENDA_OK = RSI_VENDA_OK && (iRSI_buf[i] > (100-RSILimit));
+      }
+      
+      double max_last2 = MathMax(High_buf[1], High_buf[2]);
+      double min_last2 = MathMax(Low_buf[1], Low_buf[2]);
+      
+      bool STOP_BOM_COMPRA = (max_last2 - Close_buf[0]) > ((High_buf[0] - Low_buf[0])*StopLevel);
+      bool STOP_BOM_VENDA = (Close_buf[0] - min_last2) > ((High_buf[0] - Low_buf[0])*StopLevel);
+   
+      // compra bools
+      bool CONDICOES_COMPRA_IN = 
+         CheckInterval(TimeCurrent())           // dentro do intervalo
+         && RSI_COMPRA_OK                       // RSI ultrapassou o limite
+         && STOP_BOM_COMPRA
+         && (Close_buf[0] > iSMA1_buf[0] || !CheckLongSMA);          // acima da media movel maior
+   
+      // venda bools      
+      bool CONDICOES_VENDA_IN = 
+         CheckInterval(TimeCurrent()) 
+         && RSI_VENDA_OK
+         && STOP_BOM_VENDA
+         && (Close_buf[0] < iSMA1_buf[0] || !CheckLongSMA);
+   
+      // OUT
+      if(m_Position.Select(my_symbol)) {
+         if(m_Position.PositionType() == POSITION_TYPE_BUY) {
+            if (CloseWinning) {
+               if (Close_buf[0] >= iSMASHORT_buf[0] && Close_buf[0] >= (price_open + MinPointsToProfit*Point())) {
+                  m_Trade.PositionClose(my_symbol, 0);
+               }
+            } else {
+               if (Close_buf[0] >= iSMASHORT_buf[0]) {
+                  m_Trade.PositionClose(my_symbol, 0);
+               }
             }
          }
-      }
-      if(m_Position.PositionType() == POSITION_TYPE_SELL) { 
-         if (CloseWinning) {
-            if (Close_buf[0] <= iSMASHORT_buf[0] && Close_buf[0] <= (price_open - MinPointsToProfit*Point())) {
-               m_Trade.PositionClose(my_symbol, 0);
-            }
-         } else {
-            if (Close_buf[0] <= iSMASHORT_buf[0]) {
-               m_Trade.PositionClose(my_symbol, 0);
-            }
-         }   
-      }
-   }   
-   
-   // distanced new avg price, or new entry
-   double mean_factor = position_deals * 2;
-   // double mean_factor = 1000;
-   
-   // COMPRA
-   if(CONDICOES_COMPRA_IN && (BuyOrSell_ == BUY || BuyOrSell_ == BOTH))
-   {
-   
-      if(m_Position.Select(my_symbol)) {
-
-         // mean price situation
-         // 1. check if I'm in the next candle using time based information
-         // 2. actual candle > last candle
-         if (m_Position.PositionType()==POSITION_TYPE_BUY) {
-         
-            // reach max contracts
-            if (position_deals > MaxMeanPriceX)
-               return;
-         
-            if (position_deals > 1)
-               last_deals_diff = GetPositionDealOpenPrice(1) - GetPositionDealOpenPrice(0);
-
-            if (
-                  (CheckDuration(m_Position.TimeUpdate(), CandleTimeFrame))
-                  && (Close_buf[0] < price_open)
-                  // && ((price_open - Close_buf[0]) > (iSMASHORT_buf[0] - price_open))
-                  && (
-                        (GetPositionDealOpenPrice(0) - Close_buf[0]) >= last_deals_diff * mean_factor
-                        || ((GetPositionDealOpenPrice(0) - Close_buf[0])/Point()) > 1000
-                     )
-                  && ((price_open - Close_buf[0]) > PointsFirstMeanPrice*Point())
-               ) {
-
-               // a new mean price * 2
-               new_order_volume = m_Position.Volume();
-               m_Trade.Buy(new_order_volume, my_symbol, Close_buf[0]);      
-            }
-         }   
-      
-         if(m_Position.PositionType()==POSITION_TYPE_SELL || m_Position.PositionType()==POSITION_TYPE_BUY) return;
-      }
-
-      // verifica saldo disponivel para realizar operacao
-      free_margin = m_AccountInfo.FreeMargin();
-      
-      // acerta volume em lotes de 100 com o máximo saldo disponivel
-      // new_order_volume = MathRound((free_margin * PercentualInvestir/100)/90);
-      // new_order_volume = ContractsNr;
-      if (mercado == BOVESPA)
-         new_order_volume = (Amount/Close_buf[0])-MathMod((Amount/Close_buf[0]),100);
-      else
-         new_order_volume = Amount;
-      
-      m_Trade.Buy(new_order_volume, my_symbol, Close_buf[0]);
-
-   } 
-
-   // VENDA
-   if(CONDICOES_VENDA_IN && (BuyOrSell_ == SELL || BuyOrSell_ == BOTH))
-   {
-      if(m_Position.Select(my_symbol)) {
-      
-         // mean price situation
-         // 1. check if I'm in the next candle using time based information
-         // 2. actual candle > last candle
-         if (m_Position.PositionType()==POSITION_TYPE_SELL) {
-         
-            // reach max contracts
-            if (position_deals > MaxMeanPriceX)
-               return;
-
-            if (position_deals > 1)
-               last_deals_diff = GetPositionDealOpenPrice(0) - GetPositionDealOpenPrice(1);
-         
-            if (
-                  (CheckDuration(m_Position.TimeUpdate(), CandleTimeFrame))
-                  && (Close_buf[0] > price_open)
-                  // && ((Close_buf[0] - price_open) > (price_open - iSMASHORT_buf[0]))
-                  && (
-                        (Close_buf[0] - GetPositionDealOpenPrice(0)) >= last_deals_diff * mean_factor
-                        || ((Close_buf[0] - GetPositionDealOpenPrice(0))/Point()) > 1000
-                     )
-                  && ((Close_buf[0] - price_open) > PointsFirstMeanPrice*Point())
-               ) {
-               // a new mean price * 2
-               new_order_volume = m_Position.Volume();
-               m_Trade.Sell(new_order_volume, my_symbol, Close_buf[0]);      
-            }
-         }   
-     
-      
-         if(m_Position.PositionType()==POSITION_TYPE_SELL || m_Position.PositionType()==POSITION_TYPE_BUY) return;
+         if(m_Position.PositionType() == POSITION_TYPE_SELL) { 
+            if (CloseWinning) {
+               if (Close_buf[0] <= iSMASHORT_buf[0] && Close_buf[0] <= (price_open - MinPointsToProfit*Point())) {
+                  m_Trade.PositionClose(my_symbol, 0);
+               }
+            } else {
+               if (Close_buf[0] <= iSMASHORT_buf[0]) {
+                  m_Trade.PositionClose(my_symbol, 0);
+               }
+            }   
+         }
       }   
-
-      // verifica saldo disponivel para realizar operacao
-      free_margin = m_AccountInfo.FreeMargin();
       
-      // acerta volume em lotes de 100 com o máximo saldo disponivel
-      // new_order_volume = MathRound((free_margin * PercentualInvestir/100)/90);
-      // new_order_volume = ContractsNr;
-      if (mercado == BOVESPA)
-         new_order_volume = (Amount/Close_buf[0])-MathMod((Amount/Close_buf[0]),100);
-      else
-         new_order_volume = Amount;
+      // distanced new avg price, or new entry
+      double mean_factor = position_deals * 2;
+      // double mean_factor = 1000;
       
-      // realiza a venda a mercado
-      m_Trade.Sell(new_order_volume, my_symbol, Close_buf[0]);
+      // COMPRA
+      if(CONDICOES_COMPRA_IN && (BuyOrSell_ == BUY || BuyOrSell_ == BOTH))
+      {
       
-   } 
-
+         if(m_Position.Select(my_symbol)) {
+   
+            // mean price situation
+            // 1. check if I'm in the next candle using time based information
+            // 2. actual candle > last candle
+            if (m_Position.PositionType()==POSITION_TYPE_BUY) {
+            
+               // reach max contracts
+               if (position_deals > MaxMeanPriceX)
+                  return;
+            
+               if (position_deals > 1)
+                  last_deals_diff = GetPositionDealOpenPrice(1) - GetPositionDealOpenPrice(0);
+   
+               if (
+                     (CheckDuration(m_Position.TimeUpdate(), CandleTimeFrame))
+                     && (Close_buf[0] < price_open)
+                     // && ((price_open - Close_buf[0]) > (iSMASHORT_buf[0] - price_open))
+                     && (
+                           (GetPositionDealOpenPrice(0) - Close_buf[0]) >= last_deals_diff * mean_factor
+                           || ((GetPositionDealOpenPrice(0) - Close_buf[0])/Point()) > 1000
+                        )
+                     && ((price_open - Close_buf[0]) > PointsFirstMeanPrice*Point())
+                  ) {
+   
+                  // a new mean price * 2
+                  new_order_volume = m_Position.Volume();
+                  m_Trade.Buy(new_order_volume, my_symbol, Close_buf[0]);      
+               }
+            }   
+         
+            if(m_Position.PositionType()==POSITION_TYPE_SELL || m_Position.PositionType()==POSITION_TYPE_BUY) return;
+         }
+   
+         // verifica saldo disponivel para realizar operacao
+         free_margin = m_AccountInfo.FreeMargin();
+         
+         // acerta volume em lotes de 100 com o máximo saldo disponivel
+         // new_order_volume = MathRound((free_margin * PercentualInvestir/100)/90);
+         // new_order_volume = ContractsNr;
+         if (mercado == BOVESPA)
+            new_order_volume = (Amount/Close_buf[0])-MathMod((Amount/Close_buf[0]),100);
+         else
+            new_order_volume = Amount;
+         
+         m_Trade.Buy(new_order_volume, my_symbol, Close_buf[0]);
+   
+      } 
+   
+      // VENDA
+      if(CONDICOES_VENDA_IN && (BuyOrSell_ == SELL || BuyOrSell_ == BOTH))
+      {
+         if(m_Position.Select(my_symbol)) {
+         
+            // mean price situation
+            // 1. check if I'm in the next candle using time based information
+            // 2. actual candle > last candle
+            if (m_Position.PositionType()==POSITION_TYPE_SELL) {
+            
+               // reach max contracts
+               if (position_deals > MaxMeanPriceX)
+                  return;
+   
+               if (position_deals > 1)
+                  last_deals_diff = GetPositionDealOpenPrice(0) - GetPositionDealOpenPrice(1);
+            
+               if (
+                     (CheckDuration(m_Position.TimeUpdate(), CandleTimeFrame))
+                     && (Close_buf[0] > price_open)
+                     // && ((Close_buf[0] - price_open) > (price_open - iSMASHORT_buf[0]))
+                     && (
+                           (Close_buf[0] - GetPositionDealOpenPrice(0)) >= last_deals_diff * mean_factor
+                           || ((Close_buf[0] - GetPositionDealOpenPrice(0))/Point()) > 1000
+                        )
+                     && ((Close_buf[0] - price_open) > PointsFirstMeanPrice*Point())
+                  ) {
+                  // a new mean price * 2
+                  new_order_volume = m_Position.Volume();
+                  m_Trade.Sell(new_order_volume, my_symbol, Close_buf[0]);      
+               }
+            }   
+        
+         
+            if(m_Position.PositionType()==POSITION_TYPE_SELL || m_Position.PositionType()==POSITION_TYPE_BUY) return;
+         }   
+   
+         // verifica saldo disponivel para realizar operacao
+         free_margin = m_AccountInfo.FreeMargin();
+         
+         // acerta volume em lotes de 100 com o máximo saldo disponivel
+         // new_order_volume = MathRound((free_margin * PercentualInvestir/100)/90);
+         // new_order_volume = ContractsNr;
+         if (mercado == BOVESPA)
+            new_order_volume = (Amount/Close_buf[0])-MathMod((Amount/Close_buf[0]),100);
+         else
+            new_order_volume = Amount;
+         
+         // realiza a venda a mercado
+         m_Trade.Sell(new_order_volume, my_symbol, Close_buf[0]);
+         
+      }
+   }
     
 }
