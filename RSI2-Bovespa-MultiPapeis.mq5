@@ -4,8 +4,10 @@
 //|                                             https://www.mql5.com |
 //| @description
 //|   
-//|   - Insere preco medio
 //|   - TODO: add multiplicador de preco medio progressivo
+//       - quarentine after loss until new good candle
+//       - [MAYBE] avg price after bad situation
+//       - close position in end of candle
 //|   
 //+------------------------------------------------------------------+
 
@@ -36,7 +38,7 @@ enum BMFBOV
 
 //--- input parameters
 input string            separator1        = "---General Settings---";  // #############################
-input string            papeis            = "LCAM3,FESA3,FLRY3,SAPR4,PSSA3,SANB11,RADL3,PTBL3,TAEE11,SULA11";     // Lista de Papeis separados por virgula (obs: coloque na watch list)
+input string            papeis            = "SLCE3,EGIE3,ABCB4,BBSE3,UNIP6,ESTC3,GRND3,MULT3,B3SA3,UGPA3,RENT3,MDIA3,WEGE3,ENGI11,TRPL4,EQTL3,TOTS3,EZTC3,LREN3,KROT3,CCRO3,IGTA3,TGMA3,TAEE11,ODPV3,CIEL3,LCAM3,VIVT4,BBDC3,QGEP3";     // Lista de Papeis separados por virgula (obs: coloque na watch list)
 input BMFBOV            mercado           = BOVESPA;
 input double            Amount            = 5000;              // Valor da Compra
 input ENUM_TIMEFRAMES   mytimeframe       = 0;                 // Timeframe
@@ -57,12 +59,15 @@ input bool              CheckLongSMA      = true;             // Uses Long SMA?
 input int               SMA1Period        = 200;               // Long SMA Period
 input int               SMASHORTPeriod    = 7;                 // SMA to Close Position
 
+// info sobre horario
+// https://goo.gl/yHC9jG
+// https://pt.wikipedia.org/wiki/After-Market
 input string            separator3           = "---Time Settings---"; // #############################
 input bool              CheckInterval_bool   = true;             // Check Time Interval?
 input int               StartHour            = 16;                 // Start hour
-input int               StartMinute          = 45;                 // Start minute
-input int               EndHour              = 17;                // Stop hour
-input int               EndMinute            = 0;                // Stop minute
+input int               StartMinute          = 53;                 // Start minute
+input int               EndHour              = 16;                // Stop hour
+input int               EndMinute            = 55;                // Stop minute
 
 
 string            papeis_array[];
